@@ -1,9 +1,8 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { MapPin, Loader2, Trash2, Download, Copy, Sparkles } from "lucide-react";
+import { MapPin, Loader2, Trash2, Download, Copy, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -28,8 +27,11 @@ type LocationRow = {
   created_at: string;
 };
 
+type Item =
+  | { kind: "row"; row: LocationRow }
+  | { kind: "error"; link: string; message: string; key: string };
+
 function Index() {
-  const router = useRouter();
   const process = useServerFn(processLink);
   const list = useServerFn(listLocations);
   const clear = useServerFn(clearLocations);
@@ -38,11 +40,20 @@ function Index() {
   const [input, setInput] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
 
-  const { data: rows = [], refetch } = useQuery({
-    queryKey: ["locations"],
-    queryFn: () => list() as Promise<LocationRow[]>,
-  });
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = (await list()) as LocationRow[];
+        setItems(rows.map((row) => ({ kind: "row", row }) as Item));
+      } catch {
+        // ignore
+      }
+    })();
+  }, [list]);
+
+  const successCount = items.filter((i) => i.kind === "row").length;
 
   const handleProcessAll = async () => {
     const links = input
@@ -58,32 +69,51 @@ function Index() {
     let ok = 0;
     let fail = 0;
     for (let i = 0; i < links.length; i++) {
+      const link = links[i];
       try {
-        const res = await process({ data: { link: links[i] } });
-        if (res.ok) ok++;
-        else fail++;
-      } catch {
+        const res = await process({ data: { link } });
+        if (res.ok) {
+          ok++;
+          const row = res.row as LocationRow;
+          setItems((prev) => [...prev, { kind: "row", row }]);
+        } else {
+          fail++;
+          setItems((prev) => [
+            ...prev,
+            { kind: "error", link, message: res.error, key: `${Date.now()}-${i}` },
+          ]);
+        }
+      } catch (e) {
         fail++;
+        setItems((prev) => [
+          ...prev,
+          {
+            kind: "error",
+            link,
+            message: e instanceof Error ? e.message : "Erro desconhecido",
+            key: `${Date.now()}-${i}`,
+          },
+        ]);
       }
       setProgress({ done: i + 1, total: links.length });
     }
     setProcessing(false);
     setProgress(null);
-    await refetch();
     if (ok > 0) toast.success(`${ok} localização(ões) processada(s).`);
     if (fail > 0) toast.error(`${fail} link(s) não puderam ser processados.`);
     if (ok > 0) setInput("");
   };
 
   const handleClear = async () => {
-    if (rows.length === 0) return;
+    if (items.length === 0) return;
     if (!confirm("Apagar todos os registros?")) return;
     await clear();
-    await refetch();
+    setItems([]);
     toast.success("Tudo limpo.");
   };
 
   const handleCopy = async () => {
+    const rows = items.filter((i) => i.kind === "row").map((i) => (i as { row: LocationRow }).row);
     if (rows.length === 0) return;
     const header = "Cidade\tLatitude\tLongitude\tLink";
     const body = rows
@@ -94,7 +124,7 @@ function Index() {
   };
 
   const handleExport = async () => {
-    if (rows.length === 0) return;
+    if (successCount === 0) return;
     const { base64, filename } = await exportFn();
     const bin = atob(base64);
     const bytes = new Uint8Array(bin.length);
@@ -109,8 +139,6 @@ function Index() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  void router;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
@@ -163,17 +191,17 @@ function Index() {
         <Card className="border-border/60 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
             <div className="text-sm">
-              <span className="font-medium">{rows.length}</span>{" "}
+              <span className="font-medium">{successCount}</span>{" "}
               <span className="text-muted-foreground">
-                {rows.length === 1 ? "localização" : "localizações"}
+                {successCount === 1 ? "localização" : "localizações"}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopy} disabled={rows.length === 0}>
+              <Button variant="outline" size="sm" onClick={handleCopy} disabled={successCount === 0}>
                 <Copy className="mr-2 h-4 w-4" />
                 Copiar tabela
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExport} disabled={rows.length === 0}>
+              <Button variant="outline" size="sm" onClick={handleExport} disabled={successCount === 0}>
                 <Download className="mr-2 h-4 w-4" />
                 Exportar XLSX
               </Button>
@@ -181,7 +209,7 @@ function Index() {
                 variant="outline"
                 size="sm"
                 onClick={handleClear}
-                disabled={rows.length === 0}
+                disabled={items.length === 0}
                 className="text-destructive hover:text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -191,42 +219,76 @@ function Index() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <table className="w-full border-collapse text-sm">
+              <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Cidade</th>
-                  <th className="px-4 py-3 font-medium">Latitude</th>
-                  <th className="px-4 py-3 font-medium">Longitude</th>
-                  <th className="px-4 py-3 font-medium">Link</th>
+                  <th className="w-12 border border-border px-3 py-2 text-center font-medium">#</th>
+                  <th className="border border-border px-3 py-2 font-medium">Cidade</th>
+                  <th className="border border-border px-3 py-2 font-medium">Latitude</th>
+                  <th className="border border-border px-3 py-2 font-medium">Longitude</th>
+                  <th className="border border-border px-3 py-2 font-medium">Link</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 ? (
+                {items.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">
+                    <td colSpan={5} className="border border-border px-4 py-12 text-center text-muted-foreground">
                       Nenhuma localização ainda. Cole links acima e clique em "Processar todos".
                     </td>
                   </tr>
                 ) : (
-                  rows.map((r) => (
-                    <tr key={r.id} className="border-t hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium">
-                        {r.city ?? <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs">{r.latitude}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{r.longitude}</td>
-                      <td className="max-w-[24rem] truncate px-4 py-3">
-                        <a
-                          href={r.link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          {r.link}
-                        </a>
-                      </td>
-                    </tr>
-                  ))
+                  items.map((item, idx) => {
+                    if (item.kind === "error") {
+                      return (
+                        <tr key={item.key} className="bg-destructive/5">
+                          <td className="border border-border px-3 py-2 text-center text-xs text-muted-foreground">
+                            {idx + 1}
+                          </td>
+                          <td
+                            colSpan={4}
+                            className="border border-border px-3 py-2 text-destructive"
+                          >
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium">Erro: {item.message}</div>
+                                <div className="truncate text-xs text-muted-foreground">
+                                  {item.link}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    const r = item.row;
+                    return (
+                      <tr key={r.id} className="hover:bg-muted/20">
+                        <td className="border border-border px-3 py-2 text-center text-xs text-muted-foreground">
+                          {idx + 1}
+                        </td>
+                        <td className="border border-border px-3 py-2 font-medium">
+                          {r.city ?? <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="border border-border px-3 py-2 font-mono text-xs">
+                          {r.latitude}
+                        </td>
+                        <td className="border border-border px-3 py-2 font-mono text-xs">
+                          {r.longitude}
+                        </td>
+                        <td className="max-w-[24rem] truncate border border-border px-3 py-2">
+                          <a
+                            href={r.link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            {r.link}
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
