@@ -77,11 +77,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "GeoMaps — Extrator de Localizações do Google Maps" },
+      {
+        name: "description",
+        content:
+          "Cole links do Google Maps e extraia cidade, latitude e longitude. Exporte tudo para XLSX.",
+      },
+      { name: "author", content: "GeoMaps" },
+      { property: "og:title", content: "GeoMaps — Extrator de Localizações" },
+      {
+        property: "og:description",
+        content:
+          "Cole links do Google Maps e extraia cidade, latitude e longitude. Exporte tudo para XLSX.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
