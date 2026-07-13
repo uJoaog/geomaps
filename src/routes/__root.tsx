@@ -84,7 +84,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Cole links do Google Maps e extraia cidade, latitude e longitude. Exporte tudo para XLSX.",
       },
       { name: "author", content: "GeoMaps" },
-      { property: "og:title", content: "GeoMaps — Extrator de Localizações" },
+      { property: "og:title", content: "GeoMaps — Extrator de Localizações do Google Maps" },
       {
         property: "og:description",
         content:
@@ -93,13 +93,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "GeoMaps — Extrator de Localizações do Google Maps" },
+      { name: "twitter:description", content: "Cole links do Google Maps e extraia cidade, latitude e longitude. Exporte tudo para XLSX." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c2b5b991-b871-4d26-9b71-02f6a0673f01/id-preview-caa091f7--b021c03e-fd58-4a33-8b0a-5c0a3f52bbe8.lovable.app-1783966737188.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c2b5b991-b871-4d26-9b71-02f6a0673f01/id-preview-caa091f7--b021c03e-fd58-4a33-8b0a-5c0a3f52bbe8.lovable.app-1783966737188.png" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
   shellComponent: RootShell,
