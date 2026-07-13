@@ -125,7 +125,7 @@ export const listLocations = createServerFn({ method: "GET" }).handler(async () 
   const { data, error } = await supabaseAdmin
     .from("locations")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
 });
@@ -146,7 +146,7 @@ export const exportXlsx = createServerFn({ method: "GET" }).handler(async () => 
   const { data, error } = await supabaseAdmin
     .from("locations")
     .select("city, latitude, longitude, link, created_at")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   const rows = (data ?? []).map((r) => ({
     Cidade: r.city ?? "",
