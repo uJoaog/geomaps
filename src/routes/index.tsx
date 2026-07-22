@@ -56,9 +56,12 @@ function Index() {
   const successCount = items.filter((i) => i.kind === "row").length;
 
   const handleProcessAll = async () => {
-    const links = input
-      .split(/\r?\n/)
-      .map((l) => l.trim())
+    // Aceita múltiplos links colados juntos: separados por quebra de linha,
+    // espaço, vírgula, ponto-e-vírgula, tab, ou simplesmente colados um após o outro.
+    const urlRegex = /https?:\/\/[^\s,;'"<>]+/gi;
+    const matches = input.match(urlRegex);
+    const links = (matches ?? [])
+      .map((l) => l.replace(/[.,;)\]]+$/, "").trim())
       .filter((l) => l.length > 0);
     if (links.length === 0) {
       toast.error("Cole ao menos um link do Google Maps.");
