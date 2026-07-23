@@ -10,33 +10,44 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicReceiveLocationRouteImport } from './routes/api/public/receive-location'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicReceiveLocationRoute =
+  ApiPublicReceiveLocationRouteImport.update({
+    id: '/api/public/receive-location',
+    path: '/api/public/receive-location',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/public/receive-location': typeof ApiPublicReceiveLocationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/public/receive-location': typeof ApiPublicReceiveLocationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/public/receive-location': typeof ApiPublicReceiveLocationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/public/receive-location'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/public/receive-location'
+  id: '__root__' | '/' | '/api/public/receive-location'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiPublicReceiveLocationRoute: typeof ApiPublicReceiveLocationRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +59,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/receive-location': {
+      id: '/api/public/receive-location'
+      path: '/api/public/receive-location'
+      fullPath: '/api/public/receive-location'
+      preLoaderRoute: typeof ApiPublicReceiveLocationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiPublicReceiveLocationRoute: ApiPublicReceiveLocationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -43,26 +43,44 @@ function Index() {
   const [items, setItems] = useState<Item[]>([]);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    const fetchRows = async () => {
       try {
         const rows = (await list()) as LocationRow[];
-        setItems(rows.map((row) => ({ kind: "row", row }) as Item));
+        if (cancelled) return;
+        setItems((prev) => {
+          const existingIds = new Set(
+            prev.filter((i) => i.kind === "row").map((i) => (i as { row: LocationRow }).row.id),
+          );
+          const merged: Item[] = [...prev];
+          for (const row of rows) {
+            if (!existingIds.has(row.id)) merged.push({ kind: "row", row });
+          }
+          return merged;
+        });
       } catch {
         // ignore
       }
-    })();
+    };
+    fetchRows();
+    const id = setInterval(fetchRows, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, [list]);
 
   const successCount = items.filter((i) => i.kind === "row").length;
 
   const handleProcessAll = async () => {
-    // Aceita múltiplos links colados juntos: separados por espaço/quebra de linha
-    // ou simplesmente colados um após o outro. Preserva vírgulas internas (as
-    // coordenadas do Google Maps contêm vírgulas: @lat,lng).
-    const links = input
-      .split(/\s+/)
+    // Extrai todas as URLs http(s) do texto colado, aceitando qualquer separador
+    // (espaço, vírgula, ponto-e-vírgula, quebra de linha, ou grudadas). Vírgulas
+    // dentro do URL (ex.: @lat,lng do Google Maps) são preservadas porque cada
+    // nova URL começa com "http", então cortamos no próximo "http".
+    const matches = input.match(/https?:\/\/[^\s'"<>`]+/gi) ?? [];
+    const links = matches
       .flatMap((tok) => tok.split(/(?=https?:\/\/)/))
-      .map((l) => l.replace(/[)\]>'"`]+$/, "").trim())
+      .map((l) => l.replace(/[),;.\]>'"`]+$/, "").trim())
       .filter((l) => /^https?:\/\//i.test(l));
     if (links.length === 0) {
       toast.error("Cole ao menos um link do Google Maps.");
@@ -74,27 +92,41 @@ function Index() {
     let fail = 0;
     for (let i = 0; i < links.length; i++) {
       const link = links[i];
-      try {
-        const res = await process({ data: { link } });
-        if (res.ok) {
-          ok++;
-          const row = res.row as LocationRow;
-          setItems((prev) => [...prev, { kind: "row", row }]);
-        } else {
-          fail++;
-          setItems((prev) => [
-            ...prev,
-            { kind: "error", link, message: res.error, key: `${Date.now()}-${i}` },
-          ]);
+      // Tenta até 2 vezes; erros de tentativas intermediárias não geram alerta.
+      let finalRes:
+        | { ok: true; row: LocationRow }
+        | { ok: false; error: string }
+        | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = (await process({ data: { link } })) as
+            | { ok: true; row: LocationRow }
+            | { ok: false; error: string };
+          finalRes = res;
+          if (res.ok) break;
+        } catch (e) {
+          finalRes = {
+            ok: false,
+            error: e instanceof Error ? e.message : "Erro desconhecido",
+          };
         }
-      } catch (e) {
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 400));
+      }
+      if (finalRes && finalRes.ok) {
+        ok++;
+        const row = finalRes.row;
+        setItems((prev) => {
+          if (prev.some((it) => it.kind === "row" && it.row.id === row.id)) return prev;
+          return [...prev, { kind: "row", row }];
+        });
+      } else {
         fail++;
         setItems((prev) => [
           ...prev,
           {
             kind: "error",
             link,
-            message: e instanceof Error ? e.message : "Erro desconhecido",
+            message: finalRes?.error ?? "Erro desconhecido",
             key: `${Date.now()}-${i}`,
           },
         ]);
