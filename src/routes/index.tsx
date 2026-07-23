@@ -56,13 +56,14 @@ function Index() {
   const successCount = items.filter((i) => i.kind === "row").length;
 
   const handleProcessAll = async () => {
-    // Aceita múltiplos links colados juntos: separados por quebra de linha,
-    // espaço, vírgula, ponto-e-vírgula, tab, ou simplesmente colados um após o outro.
-    const urlRegex = /https?:\/\/[^\s,;'"<>]+/gi;
-    const matches = input.match(urlRegex);
-    const links = (matches ?? [])
-      .map((l) => l.replace(/[.,;)\]]+$/, "").trim())
-      .filter((l) => l.length > 0);
+    // Aceita múltiplos links colados juntos: separados por espaço/quebra de linha
+    // ou simplesmente colados um após o outro. Preserva vírgulas internas (as
+    // coordenadas do Google Maps contêm vírgulas: @lat,lng).
+    const links = input
+      .split(/\s+/)
+      .flatMap((tok) => tok.split(/(?=https?:\/\/)/))
+      .map((l) => l.replace(/[)\]>'"`]+$/, "").trim())
+      .filter((l) => /^https?:\/\//i.test(l));
     if (links.length === 0) {
       toast.error("Cole ao menos um link do Google Maps.");
       return;
@@ -118,11 +119,10 @@ function Index() {
   const handleCopy = async () => {
     const rows = items.filter((i) => i.kind === "row").map((i) => (i as { row: LocationRow }).row);
     if (rows.length === 0) return;
-    const header = "Cidade\tLatitude\tLongitude\tLink";
     const body = rows
       .map((r) => `${r.city ?? ""}\t${r.latitude}\t${r.longitude}\t${r.link}`)
       .join("\n");
-    await navigator.clipboard.writeText(`${header}\n${body}`);
+    await navigator.clipboard.writeText(body);
     toast.success("Tabela copiada. Cole no Excel ou Sheets.");
   };
 
