@@ -77,10 +77,12 @@ function Index() {
     // (espaço, vírgula, ponto-e-vírgula, quebra de linha, ou grudadas). Vírgulas
     // dentro do URL (ex.: @lat,lng do Google Maps) são preservadas porque cada
     // nova URL começa com "http", então cortamos no próximo "http".
-    const matches = input.match(/https?:\/\/[^\s'"<>`]+/gi) ?? [];
+    // URLs do Google Maps podem conter aspas simples/duplas (ex.: 19°13'24.7"S).
+    // Só cortamos em espaços e em `<>` (delimitadores de HTML).
+    const matches = input.match(/https?:\/\/[^\s<>]+/gi) ?? [];
     const links = matches
       .flatMap((tok) => tok.split(/(?=https?:\/\/)/))
-      .map((l) => l.replace(/[),;.\]>'"`]+$/, "").trim())
+      .map((l) => l.replace(/[),;.\]>`]+$/, "").trim())
       .filter((l) => /^https?:\/\//i.test(l));
     if (links.length === 0) {
       toast.error("Cole ao menos um link do Google Maps.");
