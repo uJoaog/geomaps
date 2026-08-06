@@ -138,31 +138,45 @@ function Index() {
     setProcessing(false);
     setProgress(null);
     if (ok > 0) toast.success(`${ok} localização(ões) processada(s).`);
-    if (fail > 0) toast.error(`${fail} link(s) não puderam ser processados.`);
+    if (fail > 0) toast.warning(`${fail} link(s) com erro (linha marcada na tabela).`);
     if (ok > 0) setInput("");
   };
 
   const handleClear = async () => {
     if (items.length === 0) return;
-    if (!confirm("Apagar todos os registros?")) return;
-    await clear();
+    try {
+      await clear();
+    } catch {
+      // ignora: a limpeza local ainda acontece
+    }
     setItems([]);
     toast.success("Tudo limpo.");
   };
 
+  const exportRows = () =>
+    items.map((it) =>
+      it.kind === "row"
+        ? {
+            city: it.row.city ?? "",
+            latitude: it.row.latitude as number | string,
+            longitude: it.row.longitude as number | string,
+            link: it.row.link,
+          }
+        : { city: "Erro ao processar", latitude: "", longitude: "", link: it.link },
+    );
+
   const handleCopy = async () => {
-    const rows = items.filter((i) => i.kind === "row").map((i) => (i as { row: LocationRow }).row);
-    if (rows.length === 0) return;
-    const body = rows
-      .map((r) => `${r.city ?? ""}\t${r.latitude}\t${r.longitude}\t${r.link}`)
+    if (items.length === 0) return;
+    const body = exportRows()
+      .map((r) => `${r.city}\t${r.latitude}\t${r.longitude}\t${r.link}`)
       .join("\n");
     await navigator.clipboard.writeText(body);
     toast.success("Tabela copiada. Cole no Excel ou Sheets.");
   };
 
   const handleExport = async () => {
-    if (successCount === 0) return;
-    const { base64, filename } = await exportFn();
+    if (items.length === 0) return;
+    const { base64, filename } = await exportFn({ data: { rows: exportRows() } });
     const bin = atob(base64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
