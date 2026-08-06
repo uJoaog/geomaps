@@ -248,11 +248,11 @@ function Index() {
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopy} disabled={successCount === 0}>
+              <Button variant="outline" size="sm" onClick={handleCopy} disabled={items.length === 0}>
                 <Copy className="mr-2 h-4 w-4" />
                 Copiar tabela
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExport} disabled={successCount === 0}>
+              <Button variant="outline" size="sm" onClick={handleExport} disabled={items.length === 0}>
                 <Download className="mr-2 h-4 w-4" />
                 Exportar XLSX
               </Button>
@@ -295,19 +295,16 @@ function Index() {
                           <td className="border border-border px-3 py-2 text-center text-xs text-muted-foreground">
                             {idx + 1}
                           </td>
-                          <td
-                            colSpan={4}
-                            className="border border-border px-3 py-2 text-destructive"
-                          >
-                            <div className="flex items-start gap-2">
-                              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium">Erro: {item.message}</div>
-                                <div className="truncate text-xs text-muted-foreground">
-                                  {item.link}
-                                </div>
-                              </div>
-                            </div>
+                          <td className="border border-border px-3 py-2 font-medium text-destructive">
+                            <span className="flex items-center gap-1.5">
+                              <AlertCircle className="h-4 w-4 shrink-0" />
+                              Erro ao processar
+                            </span>
+                          </td>
+                          <td className="border border-border px-3 py-2" />
+                          <td className="border border-border px-3 py-2" />
+                          <td className="max-w-[24rem] truncate border border-border px-3 py-2 text-xs text-muted-foreground">
+                            {item.link}
                           </td>
                         </tr>
                       );
