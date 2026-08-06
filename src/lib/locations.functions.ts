@@ -140,22 +140,30 @@ export const clearLocations = createServerFn({ method: "POST" }).handler(async (
   return { ok: true as const };
 });
 
-export const exportXlsx = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+const exportSchema = z.object({
+  rows: z.array(
+    z.object({
+      city: z.string(),
+      latitude: z.union([z.number(), z.string()]),
+      longitude: z.union([z.number(), z.string()]),
+      link: z.string(),
+    }),
+  ),
+});
+
+export const exportXlsx = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => exportSchema.parse(input))
+  .handler(async ({ data }) => {
   const XLSX = await import("xlsx");
-  const { data, error } = await supabaseAdmin
-    .from("locations")
-    .select("city, latitude, longitude, link, created_at")
-    .order("created_at", { ascending: true });
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []).map((r) => ({
-    Cidade: r.city ?? "",
+  const rows = data.rows.map((r, i) => ({
+    "#": i + 1,
+    Cidade: r.city,
     Latitude: r.latitude,
     Longitude: r.longitude,
     Link: r.link,
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws["!cols"] = [{ wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 60 }];
+  ws["!cols"] = [{ wch: 6 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 60 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Localizações");
   const buf = XLSX.write(wb, { type: "base64", bookType: "xlsx" }) as string;

@@ -73,6 +73,15 @@ function Index() {
   const successCount = items.filter((i) => i.kind === "row").length;
 
   const handleProcessAll = async () => {
+    try {
+      await runProcessAll();
+    } catch {
+      setProcessing(false);
+      setProgress(null);
+    }
+  };
+
+  const runProcessAll = async () => {
     // Extrai todas as URLs http(s) do texto colado, aceitando qualquer separador
     // (espaço, vírgula, ponto-e-vírgula, quebra de linha, ou grudadas). Vírgulas
     // dentro do URL (ex.: @lat,lng do Google Maps) são preservadas porque cada
@@ -99,7 +108,7 @@ function Index() {
         | { ok: true; row: LocationRow }
         | { ok: false; error: string }
         | null = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const res = (await process({ data: { link } })) as
             | { ok: true; row: LocationRow }
@@ -112,7 +121,7 @@ function Index() {
             error: e instanceof Error ? e.message : "Erro desconhecido",
           };
         }
-        if (attempt === 0) await new Promise((r) => setTimeout(r, 400));
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 400));
       }
       if (finalRes && finalRes.ok) {
         ok++;
@@ -138,43 +147,65 @@ function Index() {
     setProcessing(false);
     setProgress(null);
     if (ok > 0) toast.success(`${ok} localização(ões) processada(s).`);
-    if (fail > 0) toast.error(`${fail} link(s) não puderam ser processados.`);
+    if (fail > 0) toast.warning(`${fail} link(s) com erro (linha marcada na tabela).`);
     if (ok > 0) setInput("");
   };
 
   const handleClear = async () => {
     if (items.length === 0) return;
-    if (!confirm("Apagar todos os registros?")) return;
-    await clear();
+    try {
+      await clear();
+    } catch {
+      // ignora: a limpeza local ainda acontece
+    }
     setItems([]);
     toast.success("Tudo limpo.");
   };
 
+  const exportRows = () =>
+    items.map((it) =>
+      it.kind === "row"
+        ? {
+            city: it.row.city ?? "",
+            latitude: it.row.latitude as number | string,
+            longitude: it.row.longitude as number | string,
+            link: it.row.link,
+          }
+        : { city: "Erro ao processar", latitude: "", longitude: "", link: it.link },
+    );
+
   const handleCopy = async () => {
-    const rows = items.filter((i) => i.kind === "row").map((i) => (i as { row: LocationRow }).row);
-    if (rows.length === 0) return;
-    const body = rows
-      .map((r) => `${r.city ?? ""}\t${r.latitude}\t${r.longitude}\t${r.link}`)
+    if (items.length === 0) return;
+    const body = exportRows()
+      .map((r) => `${r.city}\t${r.latitude}\t${r.longitude}\t${r.link}`)
       .join("\n");
-    await navigator.clipboard.writeText(body);
-    toast.success("Tabela copiada. Cole no Excel ou Sheets.");
+    try {
+      await navigator.clipboard.writeText(body);
+      toast.success("Tabela copiada. Cole no Excel ou Sheets.");
+    } catch {
+      toast.error("Não foi possível copiar. Verifique as permissões do navegador.");
+    }
   };
 
   const handleExport = async () => {
-    if (successCount === 0) return;
-    const { base64, filename } = await exportFn();
-    const bin = atob(base64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const blob = new Blob([bytes], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (items.length === 0) return;
+    try {
+      const { base64, filename } = await exportFn({ data: { rows: exportRows() } });
+      const bin = atob(base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Não foi possível gerar o arquivo XLSX.");
+    }
   };
 
   return (
@@ -234,11 +265,11 @@ function Index() {
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopy} disabled={successCount === 0}>
+              <Button variant="outline" size="sm" onClick={handleCopy} disabled={items.length === 0}>
                 <Copy className="mr-2 h-4 w-4" />
                 Copiar tabela
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExport} disabled={successCount === 0}>
+              <Button variant="outline" size="sm" onClick={handleExport} disabled={items.length === 0}>
                 <Download className="mr-2 h-4 w-4" />
                 Exportar XLSX
               </Button>
@@ -281,19 +312,16 @@ function Index() {
                           <td className="border border-border px-3 py-2 text-center text-xs text-muted-foreground">
                             {idx + 1}
                           </td>
-                          <td
-                            colSpan={4}
-                            className="border border-border px-3 py-2 text-destructive"
-                          >
-                            <div className="flex items-start gap-2">
-                              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium">Erro: {item.message}</div>
-                                <div className="truncate text-xs text-muted-foreground">
-                                  {item.link}
-                                </div>
-                              </div>
-                            </div>
+                          <td className="border border-border px-3 py-2 font-medium text-destructive">
+                            <span className="flex items-center gap-1.5">
+                              <AlertCircle className="h-4 w-4 shrink-0" />
+                              Erro ao processar
+                            </span>
+                          </td>
+                          <td className="border border-border px-3 py-2" />
+                          <td className="border border-border px-3 py-2" />
+                          <td className="max-w-[24rem] truncate border border-border px-3 py-2 text-xs text-muted-foreground">
+                            {item.link}
                           </td>
                         </tr>
                       );
