@@ -73,6 +73,15 @@ function Index() {
   const successCount = items.filter((i) => i.kind === "row").length;
 
   const handleProcessAll = async () => {
+    try {
+      await runProcessAll();
+    } catch {
+      setProcessing(false);
+      setProgress(null);
+    }
+  };
+
+  const runProcessAll = async () => {
     // Extrai todas as URLs http(s) do texto colado, aceitando qualquer separador
     // (espaço, vírgula, ponto-e-vírgula, quebra de linha, ou grudadas). Vírgulas
     // dentro do URL (ex.: @lat,lng do Google Maps) são preservadas porque cada
@@ -99,7 +108,7 @@ function Index() {
         | { ok: true; row: LocationRow }
         | { ok: false; error: string }
         | null = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const res = (await process({ data: { link } })) as
             | { ok: true; row: LocationRow }
@@ -112,7 +121,7 @@ function Index() {
             error: e instanceof Error ? e.message : "Erro desconhecido",
           };
         }
-        if (attempt === 0) await new Promise((r) => setTimeout(r, 400));
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 400));
       }
       if (finalRes && finalRes.ok) {
         ok++;
