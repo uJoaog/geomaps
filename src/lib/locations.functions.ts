@@ -39,6 +39,7 @@ async function expandShortLink(url: string): Promise<string> {
       const res = await fetch(current, {
         method: "GET",
         redirect: "manual",
+        signal: AbortSignal.timeout(45000),
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
@@ -69,7 +70,7 @@ async function expandShortLink(url: string): Promise<string> {
 async function reverseGeocodeCity(lat: number, lng: number): Promise<string | null> {
   try {
     const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=pt`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(45000) });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       city?: string;
