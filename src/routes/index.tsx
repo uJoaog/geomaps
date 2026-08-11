@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { MapPin, Loader2, Trash2, Download, Copy, Sparkles, AlertCircle } from "lucide-react";
+import { MapPin, Loader2, Trash2, Download, Copy, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -121,7 +121,7 @@ function Index() {
             error: e instanceof Error ? e.message : "Erro desconhecido",
           };
         }
-        if (attempt < 2) await new Promise((r) => setTimeout(r, 400));
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 800));
       }
       if (finalRes && finalRes.ok) {
         ok++;
@@ -147,7 +147,7 @@ function Index() {
     setProcessing(false);
     setProgress(null);
     if (ok > 0) toast.success(`${ok} localização(ões) processada(s).`);
-    if (fail > 0) toast.warning(`${fail} link(s) com erro (linha marcada na tabela).`);
+    if (fail > 0) toast.warning(`${fail} link(s) com erro (linha em branco na tabela).`);
     if (ok > 0) setInput("");
   };
 
@@ -171,7 +171,7 @@ function Index() {
             longitude: it.row.longitude as number | string,
             link: it.row.link,
           }
-        : { city: "Erro ao processar", latitude: "", longitude: "", link: it.link },
+        : { city: "", latitude: "", longitude: "", link: "" },
     );
 
   const handleCopy = async () => {
@@ -229,7 +229,9 @@ function Index() {
             Links do Google Maps
           </label>
           <p className="mb-3 text-xs text-muted-foreground">
-            Cole um link por linha. Aceita links longos e curtos (maps.app.goo.gl).
+            Cole vários links juntos (espaço, vírgula ou quebra de linha). Aceita links longos e
+            curtos (maps.app.goo.gl). Localizações erradas aparecerão em branco, mantendo a
+            numeração.
           </p>
           <Textarea
             value={input}
@@ -254,6 +256,23 @@ function Index() {
               )}
             </Button>
           </div>
+          {processing && (
+            <div className="mt-4 rounded-lg border border-border/60 bg-muted/40 p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando… isto pode levar até 1 minuto em redes corporativas. Não feche a
+                página.
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{
+                    width: `${progress && progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card className="border-border/60 shadow-sm">
@@ -308,21 +327,14 @@ function Index() {
                   items.map((item, idx) => {
                     if (item.kind === "error") {
                       return (
-                        <tr key={item.key} className="bg-destructive/5">
+                        <tr key={item.key} className="bg-muted/20">
                           <td className="border border-border px-3 py-2 text-center text-xs text-muted-foreground">
                             {idx + 1}
                           </td>
-                          <td className="border border-border px-3 py-2 font-medium text-destructive">
-                            <span className="flex items-center gap-1.5">
-                              <AlertCircle className="h-4 w-4 shrink-0" />
-                              Erro ao processar
-                            </span>
-                          </td>
+                          <td className="border border-border px-3 py-2">&nbsp;</td>
                           <td className="border border-border px-3 py-2" />
                           <td className="border border-border px-3 py-2" />
-                          <td className="max-w-[24rem] truncate border border-border px-3 py-2 text-xs text-muted-foreground">
-                            {item.link}
-                          </td>
+                          <td className="border border-border px-3 py-2" />
                         </tr>
                       );
                     }
